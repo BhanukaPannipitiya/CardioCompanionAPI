@@ -1,3 +1,4 @@
+// CardioCompanionAPI/models/User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -9,7 +10,7 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: false, // Not required for Apple Sign-In users
   },
   name: {
     type: String,
@@ -19,6 +20,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['free', 'premium'],
     default: 'free',
+  },
+  appleUserId: {
+    type: String,
+    unique: true,
+    sparse: true, // Allows multiple users without appleUserId
   },
 }, {
   timestamps: true,
