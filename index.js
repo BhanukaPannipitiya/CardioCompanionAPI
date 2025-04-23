@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
+const symptomLogRoutes = require('./routes/symptomLogs');
 
 // Debug: Print environment variables
 console.log('MONGO_URI:', process.env.MONGO_URI);
@@ -18,6 +19,7 @@ app.use(express.json());
 
 // Routes
 app.use('/users', userRoutes);
+app.use('/api/symptoms', symptomLogRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
