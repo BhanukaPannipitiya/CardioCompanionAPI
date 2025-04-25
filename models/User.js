@@ -16,6 +16,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  address: {
+    type: String,
+    trim: true,
+  },
+  dateOfBirth: {
+    type: String,
+    trim: true,
+  },
   subscriptionStatus: {
     type: String,
     enum: ['free', 'premium'],

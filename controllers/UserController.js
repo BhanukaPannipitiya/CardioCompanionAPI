@@ -5,6 +5,8 @@ const jwt = require('jsonwebtoken');
 const jwksClient = require('jwks-rsa');
 const { promisify } = require('util');
 const { sendOTPEmail } = require('../utils/emailService');
+const Medication = require('../models/Medication');
+const SymptomLog = require('../models/SymptomLog');
 
 // Store OTPs with their creation time and email
 const otpStore = new Map();
@@ -240,11 +242,161 @@ const resetPassword = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        
+        const user = await User.findById(userId).select('-password -refreshToken');
+        
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Calculate user statistics
+        const streak = await calculateStreak(userId);
+        const points = await calculatePoints(userId);
+
+        // Get user's medication adherence rate
+        const medications = await Medication.find({ userId });
+        const totalSchedules = medications.reduce((acc, med) => acc + med.schedule.length, 0);
+        const takenSchedules = medications.reduce((acc, med) => 
+            acc + med.schedule.filter(s => s.isTaken).length, 0);
+        const adherenceRate = totalSchedules > 0 ? (takenSchedules / totalSchedules) * 100 : 0;
+
+        // Get recent symptom logs
+        const recentSymptoms = await SymptomLog.find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(5);
+
+        res.json({
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            address: user.address || "",
+            dateOfBirth: user.dateOfBirth || "",
+            subscriptionStatus: user.subscriptionStatus,
+            streak,
+            points,
+            adherenceRate: Math.round(adherenceRate),
+            recentSymptoms,
+            createdAt: user.createdAt,
+            lastLogin: user.lastLogin
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+const updateUserProfile = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { name, email, address, dateOfBirth } = req.body;
+
+        console.log('📝 Updating profile for user:', userId);
+        console.log('📝 Request body:', req.body);
+
+        const user = await User.findById(userId);
+        if (!user) {
+            console.log('❌ User not found:', userId);
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update fields if provided
+        if (name) user.name = name;
+        if (email) user.email = email;
+        if (address !== undefined) user.address = address;
+        if (dateOfBirth !== undefined) user.dateOfBirth = dateOfBirth;
+
+        await user.save();
+        console.log('✅ User profile updated successfully');
+
+        // Get updated user profile with all fields
+        const updatedUser = await User.findById(userId).select('-password -refreshToken');
+        
+        // Calculate user statistics
+        const streak = await calculateStreak(userId);
+        const points = await calculatePoints(userId);
+        const medications = await Medication.find({ userId });
+        const totalSchedules = medications.reduce((acc, med) => acc + med.schedule.length, 0);
+        const takenSchedules = medications.reduce((acc, med) => 
+            acc + med.schedule.filter(s => s.isTaken).length, 0);
+        const adherenceRate = totalSchedules > 0 ? (takenSchedules / totalSchedules) * 100 : 0;
+        const recentSymptoms = await SymptomLog.find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(5);
+
+        const responseData = {
+            id: updatedUser._id,
+            email: updatedUser.email,
+            name: updatedUser.name,
+            address: updatedUser.address,
+            dateOfBirth: updatedUser.dateOfBirth,
+            subscriptionStatus: updatedUser.subscriptionStatus,
+            streak,
+            points,
+            adherenceRate: Math.round(adherenceRate),
+            recentSymptoms,
+            createdAt: updatedUser.createdAt,
+            lastLogin: updatedUser.lastLogin,
+            message: 'Profile updated successfully'
+        };
+
+        console.log('📤 Sending response data:', JSON.stringify(responseData, null, 2));
+        res.json(responseData);
+    } catch (error) {
+        console.error('❌ Error updating profile:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// Helper functions
+async function calculateStreak(userId) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const medications = await Medication.find({ userId });
+    let streak = 0;
+    let currentDate = new Date(today);
+    
+    while (true) {
+        const hasTakenMedication = medications.some(med => 
+            med.schedule.some(s => {
+                const scheduleDate = new Date(s.time);
+                scheduleDate.setHours(0, 0, 0, 0);
+                return scheduleDate.getTime() === currentDate.getTime() && s.isTaken;
+            })
+        );
+        
+        if (!hasTakenMedication) break;
+        
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+    }
+    
+    return streak;
+}
+
+async function calculatePoints(userId) {
+    const medications = await Medication.find({ userId });
+    const symptomLogs = await SymptomLog.find({ userId });
+    
+    // Points for medication adherence
+    const medicationPoints = medications.reduce((acc, med) => 
+        acc + med.schedule.filter(s => s.isTaken).length * 10, 0);
+    
+    // Points for symptom logging
+    const symptomPoints = symptomLogs.length * 5;
+    
+    return medicationPoints + symptomPoints;
+}
+
 module.exports = { 
   login, 
   register, 
   registerWithApple, 
   requestPasswordReset, 
   verifyOTP, 
-  resetPassword 
+  resetPassword,
+  getUserProfile,
+  updateUserProfile
 };

@@ -36,6 +36,7 @@ const symptomLogSchema = new mongoose.Schema({
 // Index for efficient querying by user and date
 symptomLogSchema.index({ userId: 1, timestamp: -1 });
 
-const SymptomLog = mongoose.model('SymptomLog', symptomLogSchema);
+// Check if the model already exists before creating it
+const SymptomLog = mongoose.models.SymptomLog || mongoose.model('SymptomLog', symptomLogSchema);
 
 module.exports = SymptomLog; 
