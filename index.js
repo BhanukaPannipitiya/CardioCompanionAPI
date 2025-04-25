@@ -4,6 +4,9 @@ const express = require('express');
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const symptomLogRoutes = require('./routes/symptomLogs');
+const medicationRoutes = require('./routes/medications');
+const appointmentRoutes = require('./routes/appointmentRoutes');
+const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 // Debug: Print environment variables
 console.log('MONGO_URI:', process.env.MONGO_URI);
@@ -20,12 +23,12 @@ app.use(express.json());
 // Routes
 app.use('/users', userRoutes);
 app.use('/api/symptoms', symptomLogRoutes);
+app.use('/api/medications', medicationRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something broke!', error: err.message });
-});
+app.use(notFound);
+app.use(errorHandler);
 
 // Start server
 const PORT = process.env.PORT || 3000;

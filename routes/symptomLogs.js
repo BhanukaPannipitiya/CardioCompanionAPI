@@ -1,18 +1,25 @@
 const express = require('express');
+const {
+    createSymptomLog,
+    getSymptomLogs,
+    getSymptomLogById,
+    deleteSymptomLog
+} = require('../controllers/symptomLogController');
+const protect = require('../middleware/authMiddleware');
+
 const router = express.Router();
-const auth = require('../middleware/authMiddleware');
-const symptomLogController = require('../controllers/symptomLogController');
 
-// Create a new symptom log
-router.post('/', auth, symptomLogController.createSymptomLog);
+// Protect all routes
+router.use(protect);
 
-// Get all symptom logs for the authenticated user
-router.get('/', auth, symptomLogController.getSymptomLogs);
+router.route('/')
+    .post(createSymptomLog)
+    .get(getSymptomLogs);
 
 // Get a specific symptom log by ID
-router.get('/:id', auth, symptomLogController.getSymptomLogById);
+router.get('/:id', protect, getSymptomLogById);
 
 // Delete a symptom log
-router.delete('/:id', auth, symptomLogController.deleteSymptomLog);
+router.delete('/:id', protect, deleteSymptomLog);
 
 module.exports = router; 
