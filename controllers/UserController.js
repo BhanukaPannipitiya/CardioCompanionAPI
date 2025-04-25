@@ -6,7 +6,7 @@ const jwksClient = require('jwks-rsa');
 const { promisify } = require('util');
 const { sendOTPEmail } = require('../utils/emailService');
 const Medication = require('../models/Medication');
-const SymptomLog = require('../models/SymptomLog');
+const SymptomLog = require('../models/symptomLog');
 
 // Store OTPs with their creation time and email
 const otpStore = new Map();
@@ -20,10 +20,10 @@ const client = jwksClient({
 const getAppleSigningKey = async (kid) => {
   try {
     const key = await client.getSigningKey(kid);
-    console.log('🔑 Got signing key for kid:', kid);
+    console.log(' Got signing key for kid:', kid);
     return key;
   } catch (error) {
-    console.error('❌ Error getting Apple signing key:', error);
+    console.error(' Error getting Apple signing key:', error);
     throw error;
   }
 };
@@ -96,12 +96,12 @@ const registerWithApple = async (req, res) => {
   const { identityToken, user } = req.body;
 
   try {
-    console.log('📱 Starting Apple Sign-In process');
-    console.log('📱 User data:', JSON.stringify(user, null, 2));
+    console.log(' Starting Apple Sign-In process');
+    console.log(' User data:', JSON.stringify(user, null, 2));
 
     const decodedToken = jwt.decode(identityToken, { complete: true });
     if (!decodedToken) {
-      console.error('❌ Invalid Apple identity token');
+      console.error(' Invalid Apple identity token');
       return res.status(400).json({ message: 'Invalid Apple identity token' });
     }
 
@@ -124,11 +124,11 @@ const registerWithApple = async (req, res) => {
     });
 
     if (!verifiedToken) {
-      console.error('❌ Apple token verification failed');
+      console.error(' Apple token verification failed');
       return res.status(400).json({ message: 'Apple token verification failed' });
     }
 
-    console.log('✅ Token verified successfully');
+    console.log('Token verified successfully');
 
     let existingUser = await User.findOne({ appleUserId });
     if (existingUser) {
@@ -143,7 +143,7 @@ const registerWithApple = async (req, res) => {
       });
     }
 
-    console.log('📱 Creating new user with Apple ID:', appleUserId);
+    console.log(' Creating new user with Apple ID:', appleUserId);
     const newUser = new User({
       appleUserId,
       email: email || user?.email,
@@ -152,7 +152,7 @@ const registerWithApple = async (req, res) => {
     });
 
     await newUser.save();
-    console.log('✅ New user created successfully');
+    console.log('New user created successfully');
 
     const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({
@@ -163,7 +163,7 @@ const registerWithApple = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error('❌ Apple Sign-In error:', error);
+    console.error(' Apple Sign-In error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
