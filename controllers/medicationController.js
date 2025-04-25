@@ -24,6 +24,7 @@ exports.addMedication = async (req, res) => {
         console.log('📝 Request body:', req.body);
 
         const medication = new Medication({
+            _id: req.body._id, // Use _id from request body
             name: req.body.name,
             dosage: req.body.dosage,
             schedule: req.body.schedule,
