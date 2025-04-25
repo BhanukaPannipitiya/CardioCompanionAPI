@@ -18,12 +18,14 @@ const client = jwksClient({
 });
 
 const getAppleSigningKey = async (kid) => {
-  const keys = await client.getKeys();
-  const signingKey = keys.keys.find(key => key.kid === kid);
-  if (!signingKey) {
-    throw new Error('Apple signing key not found');
+  try {
+    const key = await client.getSigningKey(kid);
+    console.log('🔑 Got signing key for kid:', kid);
+    return key;
+  } catch (error) {
+    console.error('❌ Error getting Apple signing key:', error);
+    throw error;
   }
-  return signingKey;
 };
 
 const login = async (req, res) => {
@@ -94,8 +96,12 @@ const registerWithApple = async (req, res) => {
   const { identityToken, user } = req.body;
 
   try {
+    console.log('📱 Starting Apple Sign-In process');
+    console.log('📱 User data:', JSON.stringify(user, null, 2));
+
     const decodedToken = jwt.decode(identityToken, { complete: true });
     if (!decodedToken) {
+      console.error('❌ Invalid Apple identity token');
       return res.status(400).json({ message: 'Invalid Apple identity token' });
     }
 
@@ -103,19 +109,30 @@ const registerWithApple = async (req, res) => {
     const { kid } = header;
     const { sub: appleUserId, email } = payload;
 
+    console.log('📱 Decoded token - kid:', kid);
+    console.log('📱 Decoded token - appleUserId:', appleUserId);
+    console.log('📱 Decoded token - email:', email);
+
     const signingKey = await getAppleSigningKey(kid);
     const publicKey = signingKey.getPublicKey();
+    
+    console.log('🔑 Got signing key for kid:', kid);
+
     const verifiedToken = await verifyAsync(identityToken, publicKey, {
       issuer: 'https://appleid.apple.com',
       audience: 'bhanuka.CardioCompanionApp',
     });
 
     if (!verifiedToken) {
+      console.error('❌ Apple token verification failed');
       return res.status(400).json({ message: 'Apple token verification failed' });
     }
 
+    console.log('✅ Token verified successfully');
+
     let existingUser = await User.findOne({ appleUserId });
     if (existingUser) {
+      console.log('📱 Found existing user with Apple ID:', appleUserId);
       const token = jwt.sign({ id: existingUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
       return res.json({
         id: existingUser._id,
@@ -126,6 +143,7 @@ const registerWithApple = async (req, res) => {
       });
     }
 
+    console.log('📱 Creating new user with Apple ID:', appleUserId);
     const newUser = new User({
       appleUserId,
       email: email || user?.email,
@@ -134,6 +152,7 @@ const registerWithApple = async (req, res) => {
     });
 
     await newUser.save();
+    console.log('✅ New user created successfully');
 
     const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.status(201).json({
@@ -144,7 +163,7 @@ const registerWithApple = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error('Apple Sign-In error:', error);
+    console.error('❌ Apple Sign-In error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
